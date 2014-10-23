@@ -6,16 +6,23 @@ from aqt.utils import showInfo
 from aqt.qt import *
 import os
 import sqlite3
+import anki.sync
+import anki.hooks
+
+def get_current_col():
+    return mw.col or mw.syncer.thread.col
 
 def get_decks():
     """Returns all decks available in Anki"""
+    current_col = get_current_col()
     return [Deck(deck_name,
-                 mw.col.decks.byName(deck_name)['id'])
-                 for deck_name in mw.col.decks.allNames(dyn=False)]
+                 current_col.decks.byName(deck_name)['id'])
+                 for deck_name in current_col.decks.allNames(dyn=False)]
 
 def get_deck_name(did):
     """Returns deck name based on Anki deck ID"""
-    return mw.col.decks.get(did, default=False)['name']
+    current_col = get_current_col()
+    return current_col.decks.get(did, default=False)['name']
 
 actives = {}
 
@@ -308,7 +315,6 @@ class DeckEdit(BeeAnkiWidget):
         #TODO refactor DeckEdit hardcoded string
         deck_settings = self.app_settings.get('DeckEdit')
         deck_settings[unicode(current_deck.did)] = current_deck.get_setting_value()
-        #showInfo(str(current_deck.get_setting_value()))
         self.app_settings.store('DeckEdit', deck_settings)
         self.close()
 
@@ -395,7 +401,6 @@ class DeckMain(BeeAnkiWidget):
         return buttons
 
     def build_deck_qlist(self):
-
         qdecks = QListWidget()
         #TODO: O(n^2), but likely small n
         available_dids = [deck.did for deck in self.available_decks]
@@ -510,7 +515,7 @@ class OptionsPanel(BeeAnkiWidget, SettingAware):
         form = QWidget()
         form_layout = QFormLayout()
         form.setLayout(form_layout)
-        form_layout.addRow('Sync Upon Exiting?', self.sync_options)
+        form_layout.addRow('Sync when Anki does?', self.sync_options)
         form_layout.addRow('User Name', self.user_name_line)
         form_layout.addRow('Token', self.token_line)
         buttons = QWidget()
@@ -572,11 +577,12 @@ class BeeAnkiSync(object):
 
     @classmethod
     def _time_per_decks(cls, dids, last_sync):
+        current_col = get_current_col()
         if dids is not None:
             deck_filter = " and c.did in " + cls._ids_to_in_string(dids)
         else:
             deck_filter = ""
-        (seconds_spent,) = mw.col.db.first("""
+        (seconds_spent,) = current_col.db.first("""
             select sum(time)/1000 from revlog r join cards c on c.id = r.cid where r.id > ?
             """ + deck_filter
             , last_sync*1000)
@@ -602,7 +608,7 @@ class BeeAnkiSync(object):
                 time_val = float(unsynced_secs)*offset
                 if time_val > 0:
                     self._sync(goal, time_val)
-                showInfo('synced {0} for goal {1}'.format(time_val, goal))
+                #showInfo('synced {0} for goal {1}'.format(time_val, goal))
             stored_deck.metadata.last_sync_ts = get_time()
             stored_deck.metadata.last_sync_goal = goal
             deck_edit_settings[did_str] = stored_deck.get_setting_value()
@@ -644,8 +650,23 @@ class UserMain(QWidget):
         self.layout = QFormLayout()
         self.setLayout(self.layout)
 
+def get_settings():
+    if not actives.get('settings'):
+        main_settings = BeeAnkiSettings(os.path.join(mw.pm.addonFolder(), 'beeanki.sqlite'))
+        actives['settings'] = main_settings
+    return actives['settings']
+
+def sync_exit(obj, _old=None):
+    res = _old(obj)
+    current_col = get_current_col()
+    if current_col:
+        options_screen = OptionsPanel.from_settings(get_settings())
+        if options_screen.sync_enabled:
+            options_screen.syncer.sync_all()
+    return res
+
 def main():
-    main_settings = BeeAnkiSettings(os.path.join(mw.pm.addonFolder(), 'beeanki.sqlite'))
+    main_settings = get_settings()
     main_screen = DeckMain.from_settings(main_settings)
     options_screen = OptionsPanel.from_settings(main_settings)
     tabs = BeeAnkiTabs(main_settings)
@@ -658,3 +679,4 @@ def main():
 action = QAction("beeanki", mw)
 mw.connect(action, SIGNAL("triggered()"), main)
 mw.form.menuTools.addAction(action)
+anki.sync.Syncer.sync = anki.hooks.wrap(anki.sync.Syncer.sync, sync_exit, 'around')
