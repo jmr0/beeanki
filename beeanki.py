@@ -8,6 +8,7 @@ import os
 import sqlite3
 import anki.sync
 import anki.hooks
+import re
 
 def get_current_col():
     return mw.col or mw.syncer.thread.col
@@ -29,6 +30,20 @@ actives = {}
 def get_time():
     """Returns the timestamp associated with this action"""
     return actives.get('now', 0)
+
+class BeeminderValidator(object):
+    #TODO verify token too -- haven't found a proper data type in beeminder's API yet
+
+    USER = re.compile('^[\w]+$')
+    SLUG = re.compile('^[\w-]+$')
+
+    @classmethod
+    def is_valid_slug(cls, slug):
+        return cls.SLUG.match(slug) is not None
+
+    @classmethod
+    def is_valid_user(cls, user):
+        return cls.USER.match(user) is not None
 
 class BeeAnkiSettings(object):
     """Used to write/get settings associated with BeeAnki"""
@@ -310,8 +325,11 @@ class DeckEdit(BeeAnkiWidget):
 
     def save_deck(self):
         #TODO this should really be a signal for a DeckMain slot..
-        self.main_deck_screen.deck_edited(self)
         current_deck = self.get_deck()
+        if not BeeminderValidator.is_valid_slug(current_deck.metadata.current_sync_goal):
+            showInfo('Please correct goal name: it must consist of alphanumeric characters and dashes')
+            return
+        self.main_deck_screen.deck_edited(self)
         #TODO refactor DeckEdit hardcoded string
         deck_settings = self.app_settings.get('DeckEdit')
         deck_settings[unicode(current_deck.did)] = current_deck.get_setting_value()
@@ -507,9 +525,14 @@ class OptionsPanel(BeeAnkiWidget, SettingAware):
         return cls(settings)
 
     def get_setting_value(self):
-        return self.build_settings(user_name=self.user_name,
-                                   token=self.token,
-                                   sync_enabled=self.sync_enabled)
+        params = {}
+        if self.user_name:
+            params['user_name'] = self.user_name
+        if self.token:
+            params['token'] = self.token
+        params['sync_enabled'] = self.sync_enabled
+
+        return self.build_settings(**params)
 
     def init_panel(self):
         form = QWidget()
@@ -554,8 +577,13 @@ class OptionsPanel(BeeAnkiWidget, SettingAware):
         self._set_sync_option(False)
 
     def update_settings(self):
+        old_user = self.user_name
         self.user_name = str(self.user_name_line.text())
         self.token = str(self.token_line.text())
+        if self.user_name and not BeeminderValidator.is_valid_user(self.user_name):
+            if self.user_name != old_user:
+                showInfo('Invalid Beeminder username: must be alphanumeric')
+            return
         self.app_settings.store('OptionsPanel',
                                 self.get_setting_value()
                                )
@@ -614,11 +642,13 @@ class BeeAnkiSync(object):
             deck_edit_settings[did_str] = stored_deck.get_setting_value()
             self.app_settings.store('DeckEdit', deck_edit_settings)
 
-    def _sync(self, goal, sync_val):
+    def _sync(self, slug, sync_val):
         user = self.options.user_name
         token = self.options.token
+        if not BeeminderValidator.is_valid_user(user) or not BeeminderValidator.is_valid_slug(slug):
+            return False
         site = 'www.beeminder.com'
-        api = '/api/v1/users/{user}/goals/{goal}/datapoints.json'.format(user=user, goal=goal)
+        api = '/api/v1/users/{user}/goals/{slug}/datapoints.json'.format(user=user, slug=slug)
         headers = {'Content-type': 'application/x-www-form-urlencoded', 'Accept': 'text/plain'}
         params = urllib.urlencode({'timestamp': actives['now'],
                                 'value': sync_val,
