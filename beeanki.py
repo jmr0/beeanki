@@ -11,6 +11,7 @@ import anki.hooks
 import re
 
 DEBUG = False
+actives = {}
 
 def get_current_col():
     return mw.col or mw.syncer.thread.col
@@ -26,8 +27,6 @@ def get_deck_name(did):
     """Returns deck name based on Anki deck ID"""
     current_col = get_current_col()
     return current_col.decks.get(did, default=False)['name']
-
-actives = {}
 
 def get_last_review_time(did):
     current_col = get_current_col()
@@ -154,12 +153,11 @@ class Deck(SettingAware):
 class DeckMeta(SettingAware):
     """Deck metadata representation in BeeAnki"""
     def __init__(self, last_sync_ts=None, last_sync_info=None,
-                 last_sync_goal=None, to_sync=None,
+                 last_sync_goal=None, 
                  current_sync_goal=None, tracking_opt=None):
         self.last_sync_ts = last_sync_ts
         self.last_sync_info = last_sync_info
         self.last_sync_goal = last_sync_goal
-        self.to_sync = to_sync
         self.current_sync_goal = current_sync_goal
         self.tracking_opt = tracking_opt
 
@@ -169,13 +167,11 @@ class DeckMeta(SettingAware):
         last_sync_ts = settings.get('last_sync_ts')
         last_sync_info = settings.get('last_sync_info')
         last_sync_goal = settings.get('last_sync_goal')
-        to_sync = settings.get('to_sync')
         current_sync_goal = settings.get('current_sync_goal')
         tracking_opt = settings.get('tracking_opt')
         return cls(last_sync_ts=last_sync_ts,
                    last_sync_info=last_sync_info,
                    last_sync_goal=last_sync_goal,
-                   to_sync=to_sync,
                    current_sync_goal=current_sync_goal,
                    tracking_opt=tracking_opt)
 
@@ -184,7 +180,6 @@ class DeckMeta(SettingAware):
         return self.build_settings(last_sync_ts=self.last_sync_ts,
                                    last_sync_info=self.last_sync_info,
                                    last_sync_goal=self.last_sync_goal,
-                                   to_sync=self.to_sync,
                                    current_sync_goal=self.current_sync_goal,
                                    tracking_opt=self.tracking_opt)
 
@@ -669,7 +664,7 @@ class BeeAnkiSync(object):
         site = 'www.beeminder.com'
         api = '/api/v1/users/{user}/goals/{slug}/datapoints.json'.format(user=user, slug=slug)
         headers = {'Content-type': 'application/x-www-form-urlencoded', 'Accept': 'text/plain'}
-        params = urllib.urlencode({'timestamp': actives['now'],
+        params = urllib.urlencode({'timestamp': get_time(),
                                 'value': sync_val,
                                 'comment': 'BeeAnki sync',
                                 'auth_token': token
