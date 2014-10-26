@@ -200,11 +200,15 @@ class DeckInfo(BeeAnkiWidget):
     def _add_fields(self):
         """Adds info fields"""
         meta = self.deck.metadata
-        labels = ['Last Sync', 'Synced Info',
+        labels = ['Last Sync Time', 'Synced Info',
                   'Last Sync Goal',
-                  'To Sync', 'Current Sync Goal']
+                  'Latest Review Time', 'Current Sync Goal']
+        try:
+            latest_rev_time = get_last_review_time(self.deck.did)
+        except Exception:
+            latest_rev_time = 0
         fields = [meta.last_sync_ts, meta.last_sync_info,
-                  meta.last_sync_goal, meta.to_sync,
+                  meta.last_sync_goal, latest_rev_time,
                   meta.current_sync_goal]
         for label, field in zip(labels, fields):
             self.layout.addRow(label + ': ', QLabel(str(field)
@@ -639,6 +643,7 @@ class BeeAnkiSync(object):
             last_sync = stored_deck.metadata.last_sync_ts
             tracking_opt = stored_deck.metadata.tracking_opt
             #TODO this ignores tracking options.. these need to be revised any way
+            time_val = 0
             if last_sync:
                 unsynced_secs = self._time_per_decks([did], last_sync)
                 offset = DeckEdit.TRACKING_OFFSET.get(tracking_opt)
@@ -652,6 +657,7 @@ class BeeAnkiSync(object):
             stored_deck.metadata.last_sync_ts = get_last_review_time(did)
             showInfo('syncing says last review time for deck {0} is {1}'.format(did, stored_deck.metadata.last_sync_ts))
             stored_deck.metadata.last_sync_goal = goal
+            stored_deck.metadata.last_sync_info = time_val
             deck_edit_settings[did_str] = stored_deck.get_setting_value()
             self.app_settings.store('DeckEdit', deck_edit_settings)
 
