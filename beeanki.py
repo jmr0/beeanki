@@ -10,6 +10,8 @@ import anki.sync
 import anki.hooks
 import re
 
+DEBUG = False
+
 def get_current_col():
     return mw.col or mw.syncer.thread.col
 
@@ -26,6 +28,11 @@ def get_deck_name(did):
     return current_col.decks.get(did, default=False)['name']
 
 actives = {}
+
+def get_last_review_time(did):
+    current_col = get_current_col()
+    (last_review_epoch,) = current_col.db.first("select max(r.id)/1000 from revlog r join cards c on r.cid = c.id where c.did = ?", int(did))
+    return last_review_epoch or 0
 
 def get_time():
     """Returns the timestamp associated with this action"""
@@ -270,7 +277,7 @@ class DeckEdit(BeeAnkiWidget):
         else:
             meta = DeckMeta(current_sync_goal=goal_name,
                             tracking_opt=tracking,
-                            last_sync_ts=get_time())
+                            last_sync_ts=get_last_review_time(did))
         return Deck(name, did, meta)
 
     def add_fields(self):
@@ -637,7 +644,8 @@ class BeeAnkiSync(object):
                 if time_val > 0:
                     self._sync(goal, time_val)
                 #showInfo('synced {0} for goal {1}'.format(time_val, goal))
-            stored_deck.metadata.last_sync_ts = get_time()
+            stored_deck.metadata.last_sync_ts = get_last_review_time(did)
+            showInfo('syncing says last review time for deck {0} is {1}'.format(did, stored_deck.metadata.last_sync_ts))
             stored_deck.metadata.last_sync_goal = goal
             deck_edit_settings[did_str] = stored_deck.get_setting_value()
             self.app_settings.store('DeckEdit', deck_edit_settings)
