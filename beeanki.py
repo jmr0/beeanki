@@ -209,6 +209,7 @@ class DeckInfo(BeeAnkiWidget):
         for label, field in zip(labels, fields):
             self.layout.addRow(label + ': ', QLabel(str(field)
                                if field else 'N/A'))
+    
 
 class DeckEdit(BeeAnkiWidget):
     """The deck editing screen"""
@@ -467,7 +468,11 @@ class DeckMain(BeeAnkiWidget):
         selections = self.qdecks.selectedItems()
         cur_deck = selections[0] if selections else None
         if cur_deck:
-            deck_info_window = DeckInfo(deck=cur_deck.deck)
+            did_key = unicode(cur_deck.deck.did)
+            deck_settings = self.app_settings.get('DeckEdit').get(did_key)
+            if not deck_settings:
+                raise Exception("Could not find any settings for selected deck (deck ID: {0})".format(did_key))
+            deck_info_window = DeckInfo(deck=Deck.from_settings(deck_settings))
             self.active_deck = deck_info_window
             self.active_deck.show()
 
