@@ -35,7 +35,7 @@ def get_last_review_time(did):
 
 def get_time():
     """Returns the timestamp associated with this action"""
-    return actives.get('now', 0)
+    return actives.get('now', int(time.time()))
 
 class BeeminderValidator(object):
     #TODO verify token too -- haven't found a proper data type in beeminder's API yet
@@ -650,7 +650,7 @@ class BeeAnkiSync(object):
                     self._sync(goal, time_val)
                 #showInfo('synced {0} for goal {1}'.format(time_val, goal))
             stored_deck.metadata.last_sync_ts = get_last_review_time(did)
-            showInfo('syncing says last review time for deck {0} is {1}'.format(did, stored_deck.metadata.last_sync_ts))
+            #showInfo('syncing says last review time for deck {0} is {1}'.format(did, stored_deck.metadata.last_sync_ts))
             stored_deck.metadata.last_sync_goal = goal
             stored_deck.metadata.last_sync_info = time_val
             deck_edit_settings[did_str] = stored_deck.get_setting_value()
