@@ -289,7 +289,6 @@ class DeckEdit(BeeAnkiWidget):
         form_layout.addRow('Tracking', self.tracking_options)
         save_button = QPushButton('Save')
         save_button.clicked.connect(self.save_deck)
-        #edit_button = QPushButton('Cancel')
         buttons = QWidget()
         button_row = QHBoxLayout()
         buttons.setLayout(button_row)
@@ -648,9 +647,7 @@ class BeeAnkiSync(object):
                 time_val = float(unsynced_secs)*offset
                 if time_val > 0:
                     self._sync(goal, time_val)
-                #showInfo('synced {0} for goal {1}'.format(time_val, goal))
             stored_deck.metadata.last_sync_ts = get_last_review_time(did)
-            #showInfo('syncing says last review time for deck {0} is {1}'.format(did, stored_deck.metadata.last_sync_ts))
             stored_deck.metadata.last_sync_goal = goal
             stored_deck.metadata.last_sync_info = time_val
             deck_edit_settings[did_str] = stored_deck.get_setting_value()
