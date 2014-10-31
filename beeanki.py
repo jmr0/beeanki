@@ -9,6 +9,7 @@ import sqlite3
 import anki.sync
 import anki.hooks
 import re
+from datetime import datetime
 
 DEBUG = False
 actives = {}
@@ -36,6 +37,12 @@ def get_last_review_time(did):
 def get_time():
     """Returns the timestamp associated with this action"""
     return actives.get('now', int(time.time()))
+
+def format_ts(ts_millis):
+    if not ts_millis:
+        return None
+    d = datetime.fromtimestamp(float(ts_millis)/1000)
+    return d.strftime('%d %b %Y, %I:%M%p')
 
 class BeeminderValidator(object):
     #TODO verify token too -- haven't found a proper data type in beeminder's API yet
@@ -202,9 +209,12 @@ class DeckInfo(BeeAnkiWidget):
             latest_rev_time = get_last_review_time(self.deck.did)
         except Exception:
             latest_rev_time = 0
-        fields = [meta.last_sync_ts, meta.last_sync_info,
-                  meta.last_sync_goal, latest_rev_time,
-                  meta.current_sync_goal]
+        fields = [format_ts(meta.last_sync_ts), 
+                  meta.last_sync_info,
+                  meta.last_sync_goal, 
+                  format_ts(latest_rev_time),
+                  meta.current_sync_goal
+                 ]
         for label, field in zip(labels, fields):
             self.layout.addRow(label + ': ', QLabel(str(field)
                                if field else 'N/A'))
@@ -647,9 +657,9 @@ class BeeAnkiSync(object):
                 time_val = float(unsynced_secs)*offset
                 if time_val > 0:
                     self._sync(goal, time_val)
+                    stored_deck.metadata.last_sync_info = str(time_val) + ' ' + tracking_opt
             stored_deck.metadata.last_sync_ts = get_last_review_time(did)
             stored_deck.metadata.last_sync_goal = goal
-            stored_deck.metadata.last_sync_info = time_val
             deck_edit_settings[did_str] = stored_deck.get_setting_value()
             self.app_settings.store('DeckEdit', deck_edit_settings)
 
