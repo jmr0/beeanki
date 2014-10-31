@@ -30,7 +30,7 @@ def get_deck_name(did):
 
 def get_last_review_time(did):
     current_col = get_current_col()
-    (last_review_epoch,) = current_col.db.first("select max(r.id)/1000 from revlog r join cards c on r.cid = c.id where c.did = ?", int(did))
+    (last_review_epoch,) = current_col.db.first("select max(r.id) from revlog r join cards c on r.cid = c.id where c.did = ?", int(did))
     return last_review_epoch or 0
 
 def get_time():
@@ -213,9 +213,9 @@ class DeckInfo(BeeAnkiWidget):
 class DeckEdit(BeeAnkiWidget):
     """The deck editing screen"""
     TRACKING_OPTIONS = ['Hours', 'Minutes', 'Seconds']
-    TRACKING_OFFSET = {'Hours': 1.0/3600,
-                           'Minutes': 1.0/60,
-                           'Seconds': 1.0
+    TRACKING_OFFSET = {'Hours': 1.0/(3600*1000),
+                           'Minutes': 1.0/(60*1000),
+                           'Seconds': 1.0/1000
                           }
 
     def __init__(self, app_settings, main_deck_screen,
@@ -621,9 +621,9 @@ class BeeAnkiSync(object):
         else:
             deck_filter = ""
         (seconds_spent,) = current_col.db.first("""
-            select sum(time)/1000 from revlog r join cards c on c.id = r.cid where r.id > ?
+            select sum(time) from revlog r join cards c on c.id = r.cid where r.id > ?
             """ + deck_filter
-            , last_sync*1000)
+            , last_sync)
         seconds_spent = seconds_spent or 0
         return seconds_spent
 
